@@ -49,7 +49,8 @@ class SecureQueryExecutor:
         if any(isinstance(node, FORBIDDEN) for node in tree.walk()):
             raise SQLSecurityError("Write or administrative operations are forbidden.")
         tables = {t.name.lower() for t in tree.find_all(exp.Table)}
-        unknown = tables - ALLOWED_TABLES
+        cte_aliases = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
+        unknown = tables - ALLOWED_TABLES - cte_aliases
         if unknown:
             raise SQLSecurityError(f"Access to unapproved table(s) denied: {', '.join(sorted(unknown))}.")
         if not tables:
