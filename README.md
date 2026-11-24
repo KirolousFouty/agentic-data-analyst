@@ -15,6 +15,18 @@ make seed
 
 The initial model pull can take time. The default `qwen2.5:0.5b` is CPU-compatible; change `OLLAMA_MODEL` to a locally available Qwen2.5 model if desired. API docs are at `http://localhost:8000/docs`; Prometheus scrape metrics are at `http://localhost:8000/metrics`.
 
+## Browse raw data
+
+Adminer is included for local, read-only data exploration at `http://localhost:8080` after `make up`. Sign in with:
+
+- **System:** PostgreSQL
+- **Server:** `postgres`
+- **Username:** `analyst_reader`
+- **Password:** `analyst_reader_password`
+- **Database:** `analytics`
+
+This account is limited to `SELECT` queries. Use it to browse the seven tables or run read-only SQL; it cannot alter the seeded dataset.
+
 Useful lifecycle commands:
 
 ```bash
