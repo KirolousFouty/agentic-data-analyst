@@ -75,6 +75,13 @@ def ask(request: AskRequest) -> AskResponse:
                     "please retry in a moment."),
             error="local_model_unavailable",
         )
+    except Exception:  # noqa: BLE001 - API boundary must not leak agent failures to the dashboard.
+        REQUESTS.labels("internal_error").inc()
+        return AskResponse(
+            conversation_id=cid,
+            answer="I could not complete that analysis. Please refine the metric, timeframe, or breakdown and try again.",
+            error="analysis_unavailable",
+        )
     finally:
         LATENCY.observe(time.perf_counter() - began)
 

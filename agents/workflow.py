@@ -94,13 +94,24 @@ def chart(state: AnalystState) -> dict[str, Any]:
 
 
 def respond(state: AnalystState) -> dict[str, Any]:
-    if state.get("answer") or state.get("error"):
-        return {"answer": state.get("answer", state["error"])}
+    if state.get("answer"):
+        return {"answer": state["answer"]}
+    if state.get("error"):
+        return {"answer": state["error"]}
     r = state["result"]
     if r.rows:
-        first = r.rows[0]
-        lead = ", ".join(f"{key}={value}" for key, value in first.items())
-        text = f"The analysis returned {len(r.rows)} row(s). The leading result is {lead}."
+        question = state["question"].lower()
+        ordinal = {"second": 1, "third": 2, "fourth": 3, "fifth": 4}
+        rank = next((position for word, position in ordinal.items() if word in question), 0)
+        ranked_rows = list(reversed(r.rows)) if "lowest" in question else r.rows
+        selected = ranked_rows[min(rank, len(ranked_rows) - 1)]
+        detail = ", ".join(f"{key}={value}" for key, value in selected.items())
+        if rank:
+            label = next(word for word, position in ordinal.items() if position == rank)
+            text = f"The {label} {'lowest' if 'lowest' in question else 'highest'} result is {detail}."
+        else:
+            text = f"The leading result is {detail}."
+        text += f" The analysis returned {len(r.rows)} row(s)."
     else:
         text = "The approved query completed but returned no rows."
     return {"answer": f"{text} Evidence: [Query 1] returned the displayed result data{' (limited to the configured row cap)' if r.truncated else ''}."}
