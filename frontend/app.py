@@ -19,7 +19,46 @@ st.markdown(
 )
 st.title("Enterprise AI Data Analyst Agent")
 st.caption("Local Qwen + LangGraph • Read-only PostgreSQL • Evidence-grounded responses")
-if "conversation_id" not in st.session_state: st.session_state.conversation_id = None
+if "conversation_id" not in st.session_state:
+    st.session_state.conversation_id = None
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+
+def render_response(data: dict, message_id: int) -> None:
+    with st.chat_message("assistant"):
+        st.write(data["answer"])
+        if data.get("error"):
+            st.info("The analysis service could not complete this request. You can refine the question and try again.")
+        if data.get("sql"):
+            with st.expander("Inspect executed SQL"):
+                st.code(data["sql"], language="sql")
+        if data.get("rows"):
+            frame = pd.DataFrame(data["rows"])
+            st.dataframe(frame, use_container_width=True)
+            st.download_button(
+                "Download CSV",
+                frame.to_csv(index=False),
+                f"analysis-{message_id}.csv",
+                "text/csv",
+                key=f"csv-{message_id}",
+            )
+            chart = data.get("chart")
+            if chart and chart["x"] in frame and chart["y"] in frame:
+                st.plotly_chart(
+                    px.bar(frame, x=chart["x"], y=chart["y"], title=chart["title"]),
+                    use_container_width=True,
+                    key=f"chart-{message_id}",
+                )
+
+
+for index, message in enumerate(st.session_state.chat_history):
+    if message["role"] == "user":
+        with st.chat_message("user"):
+            st.write(message["content"])
+    else:
+        render_response(message["data"], index)
+
 question = st.chat_input("Ask a business question, e.g. Which categories have the highest return rates?")
 if question:
     with st.spinner("Planning, validating, and analyzing locally…"):
@@ -30,17 +69,11 @@ if question:
             st.session_state.conversation_id=data["conversation_id"]
         except requests.RequestException:
             data = {"answer": "The analysis service is temporarily unavailable. Please retry shortly.", "error": "service_unavailable"}
-    st.chat_message("user").write(question)
-    st.chat_message("assistant").write(data["answer"])
-    if data.get("error"):
-        st.info("The local model is initializing. Your database and dashboard remain available.")
-    if data.get("sql"):
-        with st.expander("Inspect executed SQL"): st.code(data["sql"], language="sql")
-    if data.get("rows"):
-        df=pd.DataFrame(data["rows"]); st.dataframe(df, use_container_width=True)
-        st.download_button("Download CSV", df.to_csv(index=False), "analysis.csv", "text/csv")
-        chart=data.get("chart")
-        if chart and chart["x"] in df and chart["y"] in df: st.plotly_chart(px.bar(df, x=chart["x"], y=chart["y"], title=chart["title"]), use_container_width=True)
+    st.session_state.chat_history.extend([
+        {"role": "user", "content": question},
+        {"role": "assistant", "data": data},
+    ])
+    st.rerun()
 with st.sidebar:
     st.subheader("Metric definitions")
     st.caption("All monetary values are USD.")
@@ -52,3 +85,7 @@ with st.sidebar:
     st.code("Returned order items ÷ sold order items", language=None)
     st.markdown("**Retention**  ")
     st.caption("Customers ordering this month who also ordered in the preceding month.")
+    if st.button("Clear chat history", use_container_width=True):
+        st.session_state.chat_history = []
+        st.session_state.conversation_id = None
+        st.rerun()
